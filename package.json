@@ -1,0 +1,19 @@
+{
+  "name": "threejs-gpu-particles",
+  "version": "1.0.0",
+  "description": "",
+  "main": "GPUParticleSystem.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flimshaw/THREE.GPUParticleSystem.git"
+  },
+  "author": "Charlie Hoey <me@charliehoey.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/flimshaw/THREE.GPUParticleSystem/issues"
+  },
+  "homepage": "https://github.com/flimshaw/THREE.GPUParticleSystem#readme"
+}
