@@ -107,6 +107,8 @@ THREE.GPUParticleSystem = function(options) {
 
 			'attribute vec4 particlePositionsStartTime;',
 			'attribute vec4 particleVelColSizeLife;',
+			'attribute vec3 particleVelocity;',
+			'attribute float particleTurbulence;',
 
 			'varying vec4 vColor;',
 			'varying float lifeLeft;',
@@ -117,9 +119,9 @@ THREE.GPUParticleSystem = function(options) {
 			'vColor = encode_float( particleVelColSizeLife.y );',
 
 			'// convert our velocity back into a value we can use',
-			'vec4 velTurb = encode_float( particleVelColSizeLife.x );',
-			'vec3 velocity = vec3( velTurb.xyz );',
-			'float turbulence = velTurb.w;',
+			//'vec4 velTurb = encode_float( particleVelColSizeLife.x );',
+			'vec3 velocity = particleVelocity;',
+			'float turbulence = particleTurbulence;',
 
 			'vec3 newPosition;',
 
@@ -129,9 +131,9 @@ THREE.GPUParticleSystem = function(options) {
 
 			'gl_PointSize = ( uScale * particleVelColSizeLife.z ) * lifeLeft;',
 
-			'velocity.x = ( velocity.x - .5 ) * 3.;',
-			'velocity.y = ( velocity.y - .5 ) * 3.;',
-			'velocity.z = ( velocity.z - .5 ) * 3.;',
+			// 'velocity.x = ( velocity.x - .5 ) * 3.;',
+			// 'velocity.y = ( velocity.y - .5 ) * 3.;',
+			// 'velocity.z = ( velocity.z - .5 ) * 3.;',
 
 			'newPosition = particlePositionsStartTime.xyz + ( velocity * 10. ) * ( uTime - particlePositionsStartTime.a );',
 
@@ -187,17 +189,18 @@ THREE.GPUParticleSystem = function(options) {
 			'vec4 tex = texture2D( tSprite, gl_PointCoord );',
 
 			'gl_FragColor = vec4( vColor.rgb * tex.a, alpha * tex.a );',
+			// 'gl_FragColor = vec4( 1.0 );',
 			'}'
 
 		].join("\n")
 
 	};
 
-	// preload a million random numbers
+	// preload a million random numbers for speed
 	self.rand = [];
 
 	for (var i = 1e5; i > 0; i--) {
-		self.rand.push(Math.random() - .5);
+		self.rand.push(Math.random() - 0.5);
 	}
 
 	self.random = function() {
@@ -206,12 +209,15 @@ THREE.GPUParticleSystem = function(options) {
 
 	var textureLoader = new THREE.TextureLoader();
 
+	// perlin texture used to drive turbulence
 	self.particleNoiseTex = self.PARTICLE_NOISE_TEXTURE || textureLoader.load("textures/perlin-512.png");
 	self.particleNoiseTex.wrapS = self.particleNoiseTex.wrapT = THREE.RepeatWrapping;
 
+	// sprite texture rendered for each particle
 	self.particleSpriteTex = self.PARTICLE_SPRITE_TEXTURE || textureLoader.load("textures/particle2.png");
 	self.particleSpriteTex.wrapS = self.particleSpriteTex.wrapT = THREE.RepeatWrapping;
 
+	// particle system shader material definition
 	self.particleShaderMat = new THREE.ShaderMaterial({
 		transparent: true,
 		depthWrite: false,
@@ -304,6 +310,9 @@ THREE.GPUParticleContainer = function(maxParticles, particleSystem) {
 	var UINT8_VIEW = new Uint8Array(4);
 	var FLOAT_VIEW = new Float32Array(UINT8_VIEW.buffer);
 
+	// UTILITY FUNCTIONS
+
+	// decodes 4 8-bit values into a single 32 bit float value
 	function decodeFloat(x, y, z, w) {
 		UINT8_VIEW[0] = Math.floor(w);
 		UINT8_VIEW[1] = Math.floor(z);
@@ -340,13 +349,15 @@ THREE.GPUParticleContainer = function(maxParticles, particleSystem) {
 	// create a container for particles
 	self.particleUpdate = false;
 
-	// Shader Based Particle System
+	// Geometry to hold particle system vertices
 	self.particleShaderGeo = new THREE.BufferGeometry();
 
 	// new hyper compressed attributes
-	self.particleVertices = new Float32Array(self.PARTICLE_COUNT * 3); // position
-	self.particlePositionsStartTime = new Float32Array(self.PARTICLE_COUNT * 4); // position
-	self.particleVelColSizeLife = new Float32Array(self.PARTICLE_COUNT * 4);
+	self.particleVertices = new Float32Array(self.PARTICLE_COUNT * 3); // 3D position
+	self.particlePositionsStartTime = new Float32Array(self.PARTICLE_COUNT * 4); // start position + startTime
+	self.particleVelocity = new Float32Array(self.PARTICLE_COUNT * 3); // particle velocity
+	self.particleTurbulence = new Float32Array(self.PARTICLE_COUNT); // particle turbulence
+	self.particleVelColSizeLife = new Float32Array(self.PARTICLE_COUNT * 4); // particle velocity, color, size and lifetime packed into
 
 	for (var i = 0; i < self.PARTICLE_COUNT; i++) {
 		self.particlePositionsStartTime[i * 4 + 0] = 100; //x
@@ -367,9 +378,13 @@ THREE.GPUParticleContainer = function(maxParticles, particleSystem) {
 	self.particleShaderGeo.addAttribute('position', new THREE.BufferAttribute(self.particleVertices, 3));
 	self.particleShaderGeo.addAttribute('particlePositionsStartTime', new THREE.BufferAttribute(self.particlePositionsStartTime, 4).setDynamic(true));
 	self.particleShaderGeo.addAttribute('particleVelColSizeLife', new THREE.BufferAttribute(self.particleVelColSizeLife, 4).setDynamic(true));
+	self.particleShaderGeo.addAttribute('particleVelocity', new THREE.BufferAttribute(self.particleVelocity, 3).setDynamic(true));
+	self.particleShaderGeo.addAttribute('particleTurbulence', new THREE.BufferAttribute(self.particleTurbulence, 1).setDynamic(true));
 
 	self.posStart = self.particleShaderGeo.getAttribute('particlePositionsStartTime');
 	self.velCol = self.particleShaderGeo.getAttribute('particleVelColSizeLife');
+	self.velocityAttr = self.particleShaderGeo.getAttribute('particleVelocity');
+	self.turbulenceAttr = self.particleShaderGeo.getAttribute('particleTurbulence');
 
 	self.particleShaderMat = self.GPUParticleSystem.particleShaderMat;
 
@@ -386,7 +401,7 @@ THREE.GPUParticleContainer = function(maxParticles, particleSystem) {
 		velocityRandomness = 0.,
 		color = 0xffffff,
 		colorRandomness = 0.,
-		turbulence = 0.,
+		turbulence = 0.5,
 		lifetime = 0.,
 		size = 0.,
 		sizeRandomness = 0.,
@@ -435,14 +450,18 @@ THREE.GPUParticleContainer = function(maxParticles, particleSystem) {
 		var velZ = velocity.z + (particleSystem.random()) * velocityRandomness;
 
 		// convert turbulence rating to something we can pack into a vec4
-		var turbulence = Math.floor(turbulence * 254);
-
-		// clamp our value to between 0. and 1.
-		velX = Math.floor(maxSource * ((velX - -maxVel) / (maxVel - -maxVel)));
-		velY = Math.floor(maxSource * ((velY - -maxVel) / (maxVel - -maxVel)));
-		velZ = Math.floor(maxSource * ((velZ - -maxVel) / (maxVel - -maxVel)));
-
-		self.velCol.array[i * 4 + 0] = decodeFloat(velX, velY, velZ, turbulence); //vel
+		// var turbulence = Math.floor(turbulence * 254);
+		//
+		// // clamp our value to between 0. and 1.
+		// velX = Math.floor(maxSource * ((velX - -maxVel) / (maxVel - -maxVel)));
+		// velY = Math.floor(maxSource * ((velY - -maxVel) / (maxVel - -maxVel)));
+		// velZ = Math.floor(maxSource * ((velZ - -maxVel) / (maxVel - -maxVel)));
+		//
+		// self.velCol.array[i * 4 + 0] = decodeFloat(velX, velY, velZ, turbulence); //vel
+		self.turbulenceAttr.array[i] = turbulence;
+		self.velocityAttr.array[i * 3 + 0] = velX;
+		self.velocityAttr.array[i * 3 + 1] = velY;
+		self.velocityAttr.array[i * 3 + 2] = velZ;
 
 		var rgb = hexToRgb(color);
 
@@ -496,6 +515,8 @@ THREE.GPUParticleContainer = function(maxParticles, particleSystem) {
 
 			self.posStart.needsUpdate = true;
 			self.velCol.needsUpdate = true;
+			self.velocityAttr.needsUpdate = true;
+			self.turbulenceAttr.needsUpdate = true;
 
 			self.offset = 0;
 			self.count = 0;
