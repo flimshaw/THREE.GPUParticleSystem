@@ -15,5 +15,9 @@
   "bugs": {
     "url": "https://github.com/flimshaw/THREE.GPUParticleSystem/issues"
   },
-  "homepage": "https://github.com/flimshaw/THREE.GPUParticleSystem#readme"
+  "homepage": "https://github.com/flimshaw/THREE.GPUParticleSystem#readme",
+  "dependencies": {
+    "dat.gui": "^0.6.1",
+    "three": "^0.83.0"
+  }
 }

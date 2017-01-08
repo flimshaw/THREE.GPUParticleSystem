@@ -508,3 +508,5 @@ THREE.GPUParticleContainer = function(maxParticles, particleSystem) {
 
 THREE.GPUParticleContainer.prototype = Object.create(THREE.Object3D.prototype);
 THREE.GPUParticleContainer.prototype.constructor = THREE.GPUParticleContainer;
+
+module.exports = THREE.GPUParticleSystem;
