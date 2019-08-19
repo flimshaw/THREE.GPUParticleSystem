@@ -33,6 +33,16 @@ THREE.GPUParticleSystem = function(options) {
 	self.PARTICLE_CURSOR = 0;
 	self.time = 0;
 
+	/* 
+	
+		Allow a custom Blending Mode to be set... 
+		
+		Maybe WIP?: 
+		Provide some Method/s, Property/ies or Field/s 
+		to make the desired props/fields/methods more accessible...
+		
+	*/
+	self.BLENDING_MODE = options.blendingMode || THREE.AdditiveBlending;
 
 	// Custom vertex and fragement shader
 	var GPUParticleShader = {
@@ -235,7 +245,7 @@ THREE.GPUParticleSystem = function(options) {
 				value: self.particleSpriteTex
 			}
 		},
-		blending: THREE.AdditiveBlending,
+		blending: self.BLENDING_MODE,
 		vertexShader: GPUParticleShader.vertexShader,
 		fragmentShader: GPUParticleShader.fragmentShader
 	});
